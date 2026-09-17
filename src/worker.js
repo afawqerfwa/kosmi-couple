@@ -41,10 +41,12 @@ export class Room {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    const connectionId = crypto.randomUUID();
 
     this.state.acceptWebSocket(server);
-    server.serializeAttachment({ id: connectionId, roomId });
+    // Identity (clientId) is assigned once the client sends room:join, so that a
+    // browser reconnect (refresh, network blip) can be recognized as the SAME
+    // occupant instead of grabbing a second seat in a 2-person room.
+    server.serializeAttachment({ roomId });
     emit(server, "server:ready", { iceServers: getIceServers(this.env) });
 
     return new Response(null, { status: 101, webSocket: client });
@@ -61,10 +63,11 @@ export class Room {
     if (!payload?.event) return;
 
     const data = payload.data || {};
+    if (payload.event === "ping") return emit(webSocket, "pong", { t: data?.t });
     if (payload.event === "room:join") return this.join(webSocket, data);
 
     const attachment = webSocket.deserializeAttachment();
-    if (!attachment?.roomId) return emit(webSocket, "room:error", "اول وارد اتاق بشید.");
+    if (!attachment?.roomId || !attachment?.clientId) return emit(webSocket, "room:error", "اول وارد اتاق بشید.");
 
     if (payload.event === "movie:set") return this.setMovie(webSocket, data);
     if (payload.event === "movie:clear") return this.clearMovie(webSocket);
@@ -82,20 +85,34 @@ export class Room {
       return emit(webSocket, "room:error", "کد اتاق درست نیست.");
     }
 
+    // clientId is a stable id the browser keeps in localStorage, so a reload
+    // or dropped connection re-joins as the SAME person instead of a new one.
+    const clientId = String(data.clientId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || crypto.randomUUID();
+
+    // If this same person still has another (stale/zombie) socket open for this
+    // room, close it now so it can't keep occupying a seat or receiving events.
+    for (const socket of this.state.getWebSockets()) {
+      if (socket === webSocket) continue;
+      const other = socket.deserializeAttachment();
+      if (other?.roomId === roomId && other?.clientId === clientId) {
+        try { socket.close(4000, "reconnected-elsewhere"); } catch (_error) {}
+      }
+    }
+
     const room = await this.getRoom();
-    const existing = room.users.find((user) => user.id === attachment.id);
+    const existing = room.users.find((user) => user.id === clientId);
     if (room.users.length >= 2 && !existing) {
       return emit(webSocket, "room:error", "این اتاق پره؛ فقط دو نفر می‌تونن وارد بشن 💜");
     }
 
     const user = {
-      id: attachment.id,
+      id: clientId,
       name: cleanName(data.name),
       online: true,
     };
     room.users = room.users.filter((item) => item.id !== user.id);
     room.users.push(user);
-    webSocket.serializeAttachment({ ...attachment, roomId, name: user.name });
+    webSocket.serializeAttachment({ ...attachment, roomId, clientId, name: user.name });
     await this.saveRoom(room);
 
     emit(webSocket, "room:joined", { roomId, selfId: user.id });
@@ -154,7 +171,7 @@ export class Room {
     const room = await this.getRoom();
     const item = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      senderId: attachment.id,
+      senderId: attachment.clientId,
       sender: attachment.name || "مهمان",
       text: message,
       at: Date.now(),
@@ -170,7 +187,7 @@ export class Room {
     if (!attachment?.roomId || !data.target) return;
     const target = this.findSocket(data.target, attachment.roomId);
     if (!target) return;
-    const forwarded = { from: attachment.id };
+    const forwarded = { from: attachment.clientId };
     if (event === "webrtc:ice") forwarded.candidate = data.candidate;
     else forwarded.sdp = data.sdp;
     emit(target, event, forwarded);
@@ -187,7 +204,7 @@ export class Room {
   findSocket(id, roomId) {
     return this.state.getWebSockets().find((socket) => {
       const attachment = socket.deserializeAttachment();
-      return attachment?.id === id && attachment.roomId === roomId;
+      return attachment?.clientId === id && attachment.roomId === roomId;
     });
   }
 
@@ -204,14 +221,25 @@ export class Room {
 
   async leave(webSocket) {
     const attachment = webSocket.deserializeAttachment();
-    if (!attachment?.roomId) return;
+    if (!attachment?.roomId || !attachment?.clientId) return;
+
+    // If another live socket already represents this same clientId (e.g. this
+    // is the stale connection being replaced by a reconnect), don't treat it
+    // as the person actually leaving the room.
+    const stillPresent = this.state.getWebSockets().some((socket) => {
+      if (socket === webSocket) return false;
+      const other = socket.deserializeAttachment();
+      return other?.roomId === attachment.roomId && other?.clientId === attachment.clientId;
+    });
+    if (stillPresent) return;
+
     const room = await this.getRoom();
-    const wasMember = room.users.some((user) => user.id === attachment.id);
+    const wasMember = room.users.some((user) => user.id === attachment.clientId);
     if (!wasMember) return;
-    room.users = room.users.filter((user) => user.id !== attachment.id);
+    room.users = room.users.filter((user) => user.id !== attachment.clientId);
     if (!room.users.length) await this.state.storage.delete("room");
     else await this.saveRoom(room);
-    this.broadcast(attachment.roomId, "room:user-left", { id: attachment.id });
+    this.broadcast(attachment.roomId, "room:user-left", { id: attachment.clientId });
     if (room.users.length) this.broadcastUsers(attachment.roomId, room.users);
   }
 
