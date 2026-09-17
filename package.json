@@ -1,0 +1,18 @@
+{
+  "name": "kosmi-couple",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A private two-person watch party for Cloudflare Workers with synchronized playback, chat, and live peer-to-peer streaming.",
+  "main": "src/worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
