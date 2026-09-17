@@ -346,8 +346,8 @@ async function applyRemotePlayback(state) {
   else video.addEventListener("loadedmetadata", align, { once: true });
 }
 
-function emitPlayback() {
-  if (!roomId || (!video.src && !video.srcObject) || Date.now() < suppressUntil) return;
+function emitPlayback(force = false) {
+  if (!roomId || (!video.src && !video.srcObject) || (!force && Date.now() < suppressUntil)) return;
   socket.emit("video:sync", { time: video.currentTime, paused: video.paused, rate: video.playbackRate, volume: video.volume, muted: video.muted });
 }
 
@@ -447,7 +447,7 @@ $("#movie-file").addEventListener("change", (event) => {
 
 $("#speed-select").addEventListener("change", (event) => {
   video.playbackRate = Number(event.target.value);
-  emitPlayback();
+  emitPlayback(true);
 });
 
 $("#fullscreen-button").addEventListener("click", () => {
@@ -457,27 +457,31 @@ $("#fullscreen-button").addEventListener("click", () => {
 
 $("#play-pause-button").addEventListener("click", () => {
   if (!video.src && !video.srcObject) return showToast("اول یه فیلم اضافه کنید 🍿");
-  if (video.paused) video.play().catch(() => showToast("پخش خودکار اجازه نداد؛ دوباره روی پخش بزنید."));
-  else video.pause();
+  if (video.paused) {
+    video.play().then(() => emitPlayback(true)).catch(() => showToast("پخش خودکار اجازه نداد؛ دوباره روی پخش بزنید."));
+  } else {
+    video.pause();
+    emitPlayback(true);
+  }
 });
 $("#backward-button").addEventListener("click", () => {
   if (!video.src && !video.srcObject) return;
   video.currentTime = Math.max(0, video.currentTime - 10);
   updateCustomControls();
-  emitPlayback();
+  emitPlayback(true);
 });
 $("#forward-button").addEventListener("click", () => {
   if (!video.src && !video.srcObject) return;
   const end = Number.isFinite(video.duration) ? video.duration : video.currentTime + 10;
   video.currentTime = Math.min(end, video.currentTime + 10);
   updateCustomControls();
-  emitPlayback();
+  emitPlayback(true);
 });
 $("#timeline").addEventListener("input", (event) => {
   if (!Number.isFinite(video.duration)) return;
   video.currentTime = (Number(event.target.value) / 1000) * video.duration;
   updateCustomControls();
-  emitPlayback();
+  emitPlayback(true);
 });
 
 $("#chat-form").addEventListener("submit", (event) => {
