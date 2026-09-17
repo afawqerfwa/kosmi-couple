@@ -1,6 +1,0 @@
-# Copy this file to .dev.vars for local Cloudflare development.
-# Put the real values in Cloudflare Dashboard > Workers & Pages > Settings > Variables.
-TURN_URLS=turn:your-turn-host:3478,turns:your-turn-host:5349
-TURN_USERNAME=
-TURN_PASSWORD=
-TURN_ICE_SERVERS_JSON=
