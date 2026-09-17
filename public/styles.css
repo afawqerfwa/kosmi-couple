@@ -331,6 +331,9 @@ input::placeholder { color: #926ca8; }
 .timeline { flex: 1; min-width: 80px; height: 4px; padding: 0; border: 0; outline: 0; accent-color: #c05bf0; background: rgba(255,255,255,.15); box-shadow: none; }
 .timeline:focus { box-shadow: none; }
 .controls-strip .control-actions { justify-content: space-between; }
+.volume-control { display: flex; align-items: center; gap: 5px; margin: 0; color: #c6a6d2; font-size: 9px; }
+.volume-control input { width: 72px; height: 4px; padding: 0; border: 0; accent-color: #c05bf0; background: rgba(255,255,255,.15); box-shadow: none; }
+.volume-control input:focus { box-shadow: none; }
 
 @media (max-width: 520px) {
   .shared-controls { flex-wrap: wrap; }
