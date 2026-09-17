@@ -2,9 +2,73 @@ function createSocket() {
   const listeners = new Map();
   let connection = null;
   let queued = [];
+  let currentRoomId = "";
+  let wantConnected = false;
+  let reconnectAttempt = 0;
+  let reconnectTimer = null;
+  let heartbeatTimer = null;
+  let watchdogTimer = null;
+  let lastPong = 0;
 
   const dispatch = (event, data) => {
     (listeners.get(event) || []).forEach((handler) => handler(data));
+  };
+
+  const clearTimers = () => {
+    clearTimeout(reconnectTimer);
+    clearInterval(heartbeatTimer);
+    clearInterval(watchdogTimer);
+  };
+
+  const scheduleReconnect = () => {
+    if (!wantConnected) return;
+    clearTimeout(reconnectTimer);
+    const delay = Math.min(8000, 500 * 2 ** reconnectAttempt) + Math.random() * 300;
+    reconnectAttempt += 1;
+    reconnectTimer = setTimeout(() => open(), delay);
+  };
+
+  const startHeartbeat = () => {
+    clearInterval(heartbeatTimer);
+    clearInterval(watchdogTimer);
+    lastPong = Date.now();
+    heartbeatTimer = setInterval(() => {
+      if (connection?.readyState === WebSocket.OPEN) connection.send(JSON.stringify({ event: "ping", data: { t: Date.now() } }));
+    }, 15000);
+    // If the server hasn't answered a ping in a while, the socket is dead even
+    // though the browser hasn't fired onclose yet — force a reconnect.
+    watchdogTimer = setInterval(() => {
+      if (Date.now() - lastPong > 35000) {
+        try { connection?.close(); } catch (_error) {}
+      }
+    }, 5000);
+  };
+
+  const open = () => {
+    if (!currentRoomId) return;
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const endpoint = `${protocol}//${location.host}/socket?room=${encodeURIComponent(currentRoomId)}`;
+    connection = new WebSocket(endpoint);
+    connection.onopen = () => {
+      reconnectAttempt = 0;
+      startHeartbeat();
+      dispatch("connect");
+      queued.splice(0).forEach((message) => connection.send(message));
+    };
+    connection.onmessage = ({ data }) => {
+      try {
+        const message = JSON.parse(data);
+        if (message.event === "pong") { lastPong = Date.now(); return; }
+        if (message.event) dispatch(message.event, message.data);
+      } catch (_error) {}
+    };
+    connection.onerror = () => dispatch("connect_error");
+    connection.onclose = () => {
+      clearInterval(heartbeatTimer);
+      clearInterval(watchdogTimer);
+      dispatch("disconnect");
+      if (wantConnected) scheduleReconnect();
+    };
   };
 
   const api = {
@@ -19,30 +83,37 @@ function createSocket() {
       else queued.push(message);
     },
     connect(roomId) {
+      currentRoomId = roomId;
+      wantConnected = true;
+      reconnectAttempt = 0;
       if (connection) connection.close();
-      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const endpoint = `${protocol}//${location.host}/socket?room=${encodeURIComponent(roomId)}`;
-      connection = new WebSocket(endpoint);
-      connection.onopen = () => {
-        dispatch("connect");
-        queued.splice(0).forEach((message) => connection.send(message));
-      };
-      connection.onmessage = ({ data }) => {
-        try {
-          const message = JSON.parse(data);
-          if (message.event) dispatch(message.event, message.data);
-        } catch (_error) {}
-      };
-      connection.onerror = () => dispatch("connect_error");
-      connection.onclose = () => dispatch("disconnect");
+      open();
     },
     disconnect() {
+      wantConnected = false;
       queued = [];
+      clearTimers();
       if (connection) connection.close();
       connection = null;
     },
+    isConnected() {
+      return connection?.readyState === WebSocket.OPEN;
+    },
   };
   return api;
+}
+
+function getClientId() {
+  try {
+    let id = localStorage.getItem("kosmi-client-id");
+    if (!id) {
+      id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/-/g, "");
+      localStorage.setItem("kosmi-client-id", id);
+    }
+    return id;
+  } catch (_error) {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 }
 
 const socket = createSocket();
@@ -61,9 +132,11 @@ const transferProgress = $("#transfer-progress");
 const transferPercent = $("#transfer-percent");
 const toast = $("#toast");
 
+const clientId = getClientId();
 let roomId = "";
 let selfId = "";
 let selfName = "";
+let hasJoinedOnce = false;
 let users = [];
 let currentMovie = null;
 let localFile = null;
@@ -75,6 +148,7 @@ let localCaptureStream = null;
 let remoteStream = null;
 let streamingMovie = false;
 let pendingCandidates = [];
+let lastPlayback = null;
 let suppressUntil = 0;
 let toastTimer;
 
@@ -280,6 +354,9 @@ function configurePeer(pc, targetId) {
     transferOverlay.classList.add("hidden");
     transferOverlay.classList.remove("waiting");
     video.play().catch(() => showToast("برای شروع پخش، روی دکمه پخش بزنید."));
+    // The live stream just arrived: line it up with whatever the host's
+    // playback position already is, instead of starting over from 0.
+    if (lastPlayback) video.addEventListener("loadedmetadata", () => applyRemotePlayback(lastPlayback), { once: true });
     showToast("پخش مستقیم وصل شد؛ بزن بریم 🍿");
   };
   pc.onconnectionstatechange = () => {
@@ -327,7 +404,9 @@ function showStreamWaiting(title) {
 }
 
 async function applyRemotePlayback(state) {
-  if (!state || (!video.src && !currentMovie)) return;
+  if (!state) return;
+  lastPlayback = state;
+  if (!video.src && !video.srcObject && !currentMovie) return;
   const delay = state.paused ? 0 : Math.max(0, (Date.now() - state.updatedAt) / 1000);
   const targetTime = state.time + delay;
   suppressUntil = Date.now() + 650;
@@ -386,7 +465,7 @@ joinForm.addEventListener("submit", (event) => {
   }
   try { localStorage.setItem("kosmi-name", selfName); } catch (_error) {}
   socket.connect(roomId);
-  socket.emit("room:join", { roomId, name: selfName });
+  socket.emit("room:join", { roomId, name: selfName, clientId });
   setConnection("دارم وصل می‌شم...", "warn");
 });
 
@@ -526,8 +605,18 @@ updateCustomControls();
 socket.on("server:ready", ({ iceServers: servers } = {}) => {
   if (Array.isArray(servers) && servers.length) iceServers = servers;
 });
-socket.on("connect", () => setConnection(roomId ? "اتصال عشقولی برقراره ✅" : "آماده‌ایم", "online"));
-socket.on("disconnect", () => setConnection("اتصال قطع شد", "warn"));
+socket.on("connect", () => {
+  if (hasJoinedOnce && roomId) {
+    // The socket dropped and reconnected automatically (network blip, tab
+    // woke up, Cloudflare hibernation, etc). Re-join with the same identity
+    // so we land back in the same seat and get a fresh room:state.
+    socket.emit("room:join", { roomId, name: selfName, clientId });
+    setConnection("دوباره وصل شدم؛ در حال همگام‌سازی...", "warn");
+  } else {
+    setConnection(roomId ? "اتصال عشقولی برقراره ✅" : "آماده‌ایم", "online");
+  }
+});
+socket.on("disconnect", () => setConnection("اتصال قطع شد؛ در حال تلاش برای اتصال دوباره...", "warn"));
 socket.on("connect_error", () => setConnection("دارم دوباره وصل می‌شم...", "warn"));
 
 socket.on("room:error", (message) => {
@@ -537,6 +626,7 @@ socket.on("room:error", (message) => {
 socket.on("room:joined", ({ roomId: id, selfId: idOfSelf }) => {
   roomId = id;
   selfId = idOfSelf;
+  hasJoinedOnce = true;
   $("#room-code-label").textContent = roomId;
   setRoomVisible(true);
   history.replaceState({}, "", `${location.pathname}?room=${encodeURIComponent(roomId)}`);
