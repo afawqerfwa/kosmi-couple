@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8b5cf6" />
+    <meta name="description" content="Kosmi Couple؛ تماشای مشترک فیلم برای دو نفر" />
+    <title>Kosmi Couple | با هم ببینید</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <main class="shell">
+      <section id="lobby" class="lobby-view">
+        <div class="brand-lockup">
+          <div class="brand-mark"><span>♡</span></div>
+          <div>
+            <p class="eyebrow">KOSMI COUPLE</p>
+            <h1>اتصال به عشقولی 💜<br /><em>با هم فیلم ببینیم!</em></h1>
+          </div>
+        </div>
+        <p class="hero-copy">اتاقتونو بسازید، فیلم رو بفرستید و از راه دور کنار هم باشید؛ هر کاری یکی انجام بده، برای اون یکی هم انجام می‌شه.</p>
+
+        <div class="lobby-grid">
+          <form id="join-form" class="card join-card">
+            <div class="card-heading">
+              <div class="icon-orb">✦</div>
+              <div><h2>اتصال به عشقولی 💜</h2><p>کد اتاق عشقولیتون رو وارد کنید</p></div>
+            </div>
+            <label for="name-input">اسمتون</label>
+            <input id="name-input" maxlength="28" placeholder="مثلاً عشقولی من" autocomplete="nickname" required />
+            <label for="room-input">شناسهٔ اتاق</label>
+            <div class="room-input-row"><input id="room-input" maxlength="32" placeholder="مثلاً LOVE-42" required /><button class="ghost-button" id="random-room" type="button" title="ساخت کد تصادفی">↻</button></div>
+            <button class="primary-button wide" type="submit">بزن بریم 💜 <span>←</span></button>
+            <p id="lobby-error" class="error-text" role="alert"></p>
+          </form>
+
+          <div class="feature-stack">
+            <div class="hero-preview">
+              <div class="preview-top"><span class="preview-brand"><span class="preview-dot"></span> KOSMI COUPLE</span><span class="preview-live"><i></i> LIVE</span></div>
+              <div class="preview-screen"><div class="preview-glow"></div><span class="preview-play">▶</span><strong>یک شب، یک فیلم،<br /><em>دو نفر.</em></strong><small>پخش همگام فعال است</small></div>
+              <div class="preview-bottom"><div class="preview-users"><span>س</span><span>م</span></div><span>اتصال مستقیم برقرار است</span><b>♡</b></div>
+            </div>
+            <div class="feature-card"><span class="feature-icon">◉</span><div><strong>همزمان فیلم ببینیم 🍿</strong><p>پخش، توقف و جلو عقب کردن برای هر دوتون یکیه.</p></div><b>01</b></div>
+            <div class="feature-card"><span class="feature-icon">↗</span><div><strong>فیلم رو بفرست 💌</strong><p>یکی فایل رو انتخاب کنه، اون یکی هم می‌بینه؛ بدون آپلود روی سرور.</p></div><b>02</b></div>
+          </div>
+        </div>
+        <p class="privacy-note">اتاق‌ها موقتی‌ان و فیلم روی سرور ذخیره نمی‌شه ✅</p>
+      </section>
+
+      <section id="room" class="room-view hidden">
+        <header class="topbar">
+          <div class="brand-mini"><div class="brand-mark small"><span>♡</span></div><span>اتصال به <b>عشقولی</b> 💜</span></div>
+          <div class="room-meta"><span class="room-label">اتاق</span><strong id="room-code-label">—</strong><button id="copy-room" class="icon-button" title="کپی لینک اتاق">▣</button></div>
+          <div class="connection-pill"><span id="connection-dot" class="status-dot"></span><span id="connection-label">در حال اتصال...</span></div>
+          <button id="leave-room" class="leave-button">خروج</button>
+        </header>
+
+        <div class="room-layout">
+          <section class="watch-column">
+            <div class="movie-header">
+              <div><p class="eyebrow">اتاق دونفرهٔ شما</p><h2 id="movie-title">انتخاب فیلم برای تماشای مشترک 🎬</h2><p id="movie-subtitle">یه فیلم اضافه کنید تا با هم شروع کنیم.</p></div>
+              <div class="people-row" id="people-row"></div>
+            </div>
+            <div class="video-frame" id="video-frame">
+              <video id="movie-player" controls autoplay playsinline preload="metadata"></video>
+              <div id="video-empty" class="video-empty"><div class="empty-heart">♡</div><h3>صفحه‌مون آماده‌ست 🍿</h3><p>فیلم رو از لینک یا فایل دستگاهتون اضافه کنید.</p><button id="empty-add" class="primary-button">افزودن فیلم <span>＋</span></button></div>
+              <div id="transfer-overlay" class="transfer-overlay hidden"><div class="spinner"></div><strong id="transfer-title">در حال دریافت فیلم...</strong><div class="progress-track"><span id="transfer-progress"></span></div><small id="transfer-percent">۰٪</small></div>
+            </div>
+            <div class="controls-strip">
+              <div class="shared-controls" aria-label="کنترل مشترک فیلم">
+                <button id="backward-button" class="movie-control" type="button" title="۱۰ ثانیه عقب">↶ ۱۰ث</button>
+                <button id="play-pause-button" class="movie-control main-control" type="button">▶ پخش</button>
+                <button id="forward-button" class="movie-control" type="button" title="۱۰ ثانیه جلو">۱۰ث ↷</button>
+                <span id="time-label" class="time-label">۰۰:۰۰ / ۰۰:۰۰</span>
+                <input id="timeline" class="timeline" type="range" min="0" max="1000" value="0" step="1" aria-label="خط زمان فیلم" />
+              </div>
+              <div class="control-actions"><div class="sync-badge"><span class="pulse-dot"></span> کنترل برای هر دوتون ✅</div><button id="stop-button" class="text-control" type="button">■ از اول</button><button id="mute-button" class="text-control" type="button">🔊 صدا</button><label class="volume-control">صدا <input id="volume-range" type="range" min="0" max="100" value="100" step="1" aria-label="بلندی صدا" /></label><label>سرعت <select id="speed-select"><option value="0.5">۰.۵×</option><option value="0.75">۰.۷۵×</option><option value="1" selected>۱×</option><option value="1.25">۱.۲۵×</option><option value="1.5">۱.۵×</option><option value="2">۲×</option></select></label><button id="fullscreen-button" class="text-control" type="button">تمام‌صفحه ⛶</button></div>
+            </div>
+
+            <div class="add-movie card">
+              <div class="section-heading"><div><h3>انتخاب فیلم برای تماشای مشترک 👻</h3><p>لینک بدید یا فیلم رو مستقیم برای عشقولیتون بفرستید.</p></div><button id="clear-movie" class="text-danger hidden">حذف فیلم</button></div>
+              <div class="movie-input-grid"><input id="movie-url" type="url" placeholder="لینک مستقیم فیلم (https://...)" /><button id="add-url" class="secondary-button">افزودن لینک</button><label class="file-button"><input id="movie-file" type="file" accept="video/*" />انتخاب فایل 💌 <span>↑</span></label></div>
+              <p class="hint">فیلم به‌صورت زنده بین دو مرورگر پخش می‌شه و روی سرور آپلود نمی‌شه ✅</p>
+            </div>
+          </section>
+
+          <aside class="side-column">
+            <section class="card people-card"><div class="section-heading"><div><h3>عشقولی‌های اتاق 💕</h3><p id="people-subtitle">منتظر عشقولیتونیم...</p></div><span class="live-tag">LIVE</span></div><div id="people-list" class="people-list"></div></section>
+            <section class="card chat-card"><div class="chat-heading"><div><h3>گپ عشقولی 💬</h3><p>یه چیزی بگو که لبخند بیاره :)</p></div><span class="chat-icon">✦</span></div><div id="chat-messages" class="chat-messages"></div><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="500" placeholder="پیامتو بنویس..." autocomplete="off" /><button type="submit" aria-label="ارسال">↑</button></form></section>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
